@@ -9,7 +9,7 @@ import config
 from lib.log import Log
 import lib.daemon as daemon
 from lib.fping import fping
-from linkage import Linkage
+from mon.linkage import Linkage
 import time
 import signal
 
