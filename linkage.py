@@ -17,13 +17,13 @@ class Linkage (object):
     
     def __init__ (self, ip, alarm_levels, recover_thres):
         self.ip = ip
-        assert isinstance (alarm_level, (tuple, list))
+        assert isinstance (alarm_levels, (tuple, list))
         assert recover_thres > 0
         self.alarm_levels = alarm_levels
         self.recover_thres = recover_thres
         self.reset_bitmap ()
 
-    def reset_bitmap (self):    
+    def reset_bitmap (self):
         self.bitmap = []
         self.total_latency = 0
 
@@ -58,11 +58,12 @@ class Linkage (object):
         return None
 
 
-    def stringify (self);
+    def stringify (self):
         state = self.last_state and "good" or "bad"
         avg_latency = -1
-        if len (self.bitmap) > 0:
-            avg_latency = self.total_latency / len (self.bitmap)
+        good_count = len (filter (lambda x: x == '1', self.bitmap))
+        if good_count > 0:
+            avg_latency = self.total_latency * 1.0 / good_count
         return "%s :state %s, bitmap=%s, avg_rtt=%s" % (
                 self.ip,
                 state,
