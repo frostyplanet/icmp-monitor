@@ -90,7 +90,7 @@ class ICMPMonitor (object):
                     self._alarm_enqueue (link) 
                 print ip, "ok", rtt
                 if len (link.bitmap) == self.log_length_per_link:
-                    self.logger_links.info (link.stringify ())
+                    self.logger_links.info (link.details ())
                     link.reset_bitmap ()
             for ip, err in error_dict.iteritems ():
                 link = self.linkage_dict[ip]
@@ -99,7 +99,7 @@ class ICMPMonitor (object):
                     self._alarm_enqueue (link) 
                 print ip, "err", link.bitmap
                 if len (link.bitmap) == self.log_length_per_link:
-                    self.logger_links.info (link.stringify ())
+                    self.logger_links.info (link.details ())
                     link.reset_bitmap ()
                 
             end_time = time.time ()
