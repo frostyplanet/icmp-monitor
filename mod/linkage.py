@@ -24,6 +24,7 @@ class Linkage (object):
         self.recover_thres = recover_thres
         self.reset_bitmap ()
         self.hostname = socket.gethostname ()
+        self.last_state = True
 
     def reset_bitmap (self):
         self.bitmap = []
