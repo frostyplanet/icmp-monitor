@@ -9,7 +9,9 @@ import config
 from lib.log import Log
 import lib.daemon as daemon
 from lib.fping import fping
-from mon.linkage import Linkage
+from mod.linkage import Linkage
+from lib.job_queue import JobQueue
+from mod.alarm import EmailAlarm, AlarmJob
 import time
 import signal
 
@@ -19,6 +21,8 @@ class ICMPMonitor (object):
         self.is_running = False
         self.linkage_dict = dict ()
         self.logger = Log ("icmp_mon", config=config) 
+        self.alarm_q = JobQueue (self.logger)
+        self.emailalarm = EmailAlarm (Log ("alarm", config=config))
         self.logger_links = Log ("links", config=config)
         if 'log_length_per_link' in dir (config):
             self.log_length_per_link = config.log_length_per_link
@@ -57,10 +61,22 @@ class ICMPMonitor (object):
         self.logger.info ("%d link loaded from config" % (len (self.linkage_dict.keys ())))
 
     def start (self):
+        if self.is_running:
+            return
         self.is_running = True
+        self.alarm_q.start_worker (1)
+        self.logger.info ("started")
 
     def stop (self):
+        if not self.is_running:
+            return
         self.is_running = False
+        self.alarm_q.stop ()
+        self.logger.info ("stopped")
+
+    def _alarm_enqueue (self, link):
+        job = AlarmJob (self.emailalarm, link.alarm_text (), link.details ())
+        self.alarm_q.put_job (job)
 
     def loop (self):
         ips = self.linkage_dict.keys ()
@@ -70,9 +86,9 @@ class ICMPMonitor (object):
             for ip, rtt in recv_dict.iteritems ():
                 link = self.linkage_dict[ip]
                 res = link.new_state (True, rtt)
-                if res is True:
-                    pass
-                    # recover
+                if res:
+                    self._alarm_enqueue (link) 
+                print ip, "ok", rtt
                 if len (link.bitmap) == self.log_length_per_link:
                     self.logger_links.info (link.stringify ())
                     link.reset_bitmap ()
@@ -80,15 +96,15 @@ class ICMPMonitor (object):
                 link = self.linkage_dict[ip]
                 res = link.new_state (False, 0)
                 if res is False:
-                    pass
-                    # bad
+                    self._alarm_enqueue (link) 
+                print ip, "err", link.bitmap
                 if len (link.bitmap) == self.log_length_per_link:
                     self.logger_links.info (link.stringify ())
                     link.reset_bitmap ()
                 
             end_time = time.time ()
             if end_time < start_time + 1:
-                time.sleep (1 - end_time - start_time)
+                time.sleep (1 - end_time + start_time)
 
             
 stop_signal_flag = False

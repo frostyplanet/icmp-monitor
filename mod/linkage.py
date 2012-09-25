@@ -2,6 +2,7 @@
 # coding:utf-8
 
 # author: frostyplanet@gmail.com
+import socket
 
 class Linkage (object):
 
@@ -13,7 +14,7 @@ class Linkage (object):
     bad_count = 0
     recover_count = 0
     cur_alarm_level = 0
-    total_latency = 0
+    total_latency = 0.0
     
     def __init__ (self, ip, alarm_levels, recover_thres):
         self.ip = ip
@@ -22,14 +23,15 @@ class Linkage (object):
         self.alarm_levels = alarm_levels
         self.recover_thres = recover_thres
         self.reset_bitmap ()
+        self.hostname = socket.gethostname ()
 
     def reset_bitmap (self):
         self.bitmap = []
-        self.total_latency = 0
+        self.total_latency = 0.0
 
     def new_state (self, is_ok, latency):
         """ pass the current ping state, return alarm state , None for unchange, False for bad, True for normal """
-        self.total_latency += latency
+        self.total_latency += latency * 1000.0
         bit = is_ok and '1' or '0'
         self.bitmap.append (bit)
         if is_ok:
@@ -57,14 +59,20 @@ class Linkage (object):
                 pass
         return None
 
+    def alarm_text (self):
+        if self.last_state:
+           return "[alarm] from %s to %s recover" % (self.hostname, self.ip)
+        else:
+           return "[alarm] from %s to %s timeout(%s)" % (self.hostname, self.ip, self.cur_alarm_level)
 
-    def stringify (self):
+
+    def details (self):
         state = self.last_state and "good" or "bad"
         avg_latency = -1
         good_count = len (filter (lambda x: x == '1', self.bitmap))
         if good_count > 0:
-            avg_latency = self.total_latency * 1.0 / good_count
-        return "%s :state %s, bitmap=%s, avg_rtt=%s" % (
+            avg_latency = self.total_latency / good_count
+        return "%s :%s, bitmap=%s, avg_rtt=%.2fms" % (
                 self.ip,
                 state,
                 "".join (self.bitmap),

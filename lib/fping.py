@@ -117,7 +117,7 @@ def checksum(source_string):
 
 def receive_one_ping(sock, ID):
     """
-    receive the ping from the socket.
+    receive the ping  (ip, rtt) from the socket. rtt is float value in seconds
     """
     recv_packet, addr = sock.recvfrom(1024)
     icmp_header = recv_packet[20:28]
