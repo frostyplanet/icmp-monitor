@@ -31,34 +31,50 @@ class ICMPMonitor (object):
         if 'links' not in dir (config):
             self.logger.error ("no 'links' in config")
             return
+        g_alarm_levels = None
+        g_recover = None
+        if 'alarm_levels' in dir (config):
+            g_alarm_levels = self._parse_alarm_levels (config.alarm_levels)
+        if 'recover' in dir (config):
+            g_recover = int(config.recover)
         links = config.links
         if isinstance (links, dict):
             for ip, v in links.iteritems ():
-                alarm_levels = None
-                ttl = None
-                recover = None
-                try:
-                    alarm_levels = v['alarm_levels']
-                    ttl = v['ttl']
-                    recover = v['recover']
-                except KeyError, e:
-                    self.logger.error ("config: ip %s, %s" % (ip, str(e)))
+                ttl = v.get ('ttl')
+                if ttl >=  0:
+                    pass
+                else:
+                    ttl = 0
+                alarm_levels = v.get ('alarm_levels')
+                if not alarm_levels and g_alarm_levels:
+                    alarm_levels = g_alarm_levels
+                elif alarm_levels:
+                    alarm_levels = self._parse_alarm_levels (alarm_levels)
+                    if not alarm_levels:
+                        continue
+                else:
+                    self.logger.error ("config: %s, missing alarm_levels value" % (ip))
                     continue
-                if ttl < 0:
-                    self.logger.error ("config: ip %s, ttl < 0" % (ip))
-                    continue
-                if not isinstance (alarm_levels, (tuple, list)):
-                    self.logger.error ("config: ip %s, alarm_levels is not a list" % (ip))
-                    continue
-                _alarm_levels = filter (lambda x: isinstance (x, int), alarm_levels) 
-                if len (_alarm_levels) != len (alarm_levels):
-                    self.logger.error ("config: ip %s, elements in alarm_levels must be integers")
-                    continue
-                if not isinstance (recover, int):
-                    self.logger.error ("config: ip %s, recover is not integer")
+                recover = v.get ('recover')
+                if recover:
+                    recover = int (recover)
+                elif not recover and g_recover:
+                    recover = g_recover
+                else:
+                    self.logger.error ("config: %s, missing recover value" % (ip))
                     continue
                 self.linkage_dict[ip] = Linkage (ip, alarm_levels, recover)
         self.logger.info ("%d link loaded from config" % (len (self.linkage_dict.keys ())))
+
+    def _parse_alarm_levels (self, alarm_levels, ip=""):
+        if not isinstance (alarm_levels, (tuple, list)):
+            self.logger.error ("config: %s, alarm_levels is not a list" % (ip))
+            return
+        _alarm_levels = filter (lambda x: isinstance (x, int), alarm_levels)
+        if len (_alarm_levels) != len (alarm_levels):
+            self.logger.error ("config: %s, elements in alarm_levels must be integers" % (ip))
+            return
+        return _alarm_levels
 
     def start (self):
         if self.is_running:
