@@ -16,8 +16,7 @@ log_length_per_link = 60
 alarm_levels = [10, 60, 600]
 recover = 20
 links = {
-        "127.0.0.1": {
-            },
+        "127.0.0.1": None,
         "192.168.1.1": {
             "alarm_levels": [10, 60, 600],
             "recover": 20,
