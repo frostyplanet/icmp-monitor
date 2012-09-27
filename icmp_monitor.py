@@ -75,7 +75,9 @@ class ICMPMonitor (object):
         self.logger.info ("stopped")
 
     def _alarm_enqueue (self, link):
-        job = AlarmJob (self.emailalarm, link.alarm_text (), link.details ())
+        t = "%Y-%m-%d %H:%M:%S"
+        ts = "[%s]" % (time.strftime (t, time.localtime()))
+        job = AlarmJob (self.emailalarm, ts + link.alarm_text (), link.details ())
         self.alarm_q.put_job (job)
 
     def loop (self):

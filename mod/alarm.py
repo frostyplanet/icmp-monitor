@@ -59,8 +59,10 @@ class EmailAlarm (object):
             msg['To'] = recipient
 
             server.sendmail(config_email.SENDER_MAIL, recipient, msg.as_string())
+            self.logger.info ("sent %s " %  (subject))
         except Exception, e:
             self.logger.exception (e)
+            self.logger.error ("cannot send %s " %  (subject))
 
         
 
