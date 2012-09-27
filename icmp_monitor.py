@@ -38,33 +38,34 @@ class ICMPMonitor (object):
         if 'recover' in dir (config):
             g_recover = int(config.recover)
         links = config.links
-        if not isinstance (links, dict):
-            links = {}
-        for ip, v in links.iteritems ():
-            ttl = v.get ('ttl')
-            if ttl >=  0:
-                pass
-            else:
-                ttl = 0
-            alarm_levels = v.get ('alarm_levels')
-            if not alarm_levels and g_alarm_levels:
-                alarm_levels = g_alarm_levels
-            elif alarm_levels:
-                alarm_levels = self._parse_alarm_levels (alarm_levels)
-                if not alarm_levels:
+        if isinstance (links, dict):
+            for ip, v in links.iteritems ():
+                if not isinstance (v, dict):
+                    v = dict ()
+                ttl = v.get ('ttl')
+                if ttl >=  0:
+                    pass
+                else:
+                    ttl = 0
+                alarm_levels = v.get ('alarm_levels')
+                if not alarm_levels and g_alarm_levels:
+                    alarm_levels = g_alarm_levels
+                elif alarm_levels:
+                    alarm_levels = self._parse_alarm_levels (alarm_levels)
+                    if not alarm_levels:
+                        continue
+                else:
+                    self.logger.error ("config: %s, missing alarm_levels value" % (ip))
                     continue
-            else:
-                self.logger.error ("config: %s, missing alarm_levels value" % (ip))
-                continue
-            recover = v.get ('recover')
-            if recover:
-                recover = int (recover)
-            elif not recover and g_recover:
-                recover = g_recover
-            else:
-                self.logger.error ("config: %s, missing recover value" % (ip))
-                continue
-            self.linkage_dict[ip] = Linkage (ip, alarm_levels, recover)
+                recover = v.get ('recover')
+                if recover:
+                    recover = int (recover)
+                elif not recover and g_recover:
+                    recover = g_recover
+                else:
+                    self.logger.error ("config: %s, missing recover value" % (ip))
+                    continue
+                self.linkage_dict[ip] = Linkage (ip, alarm_levels, recover)
         self.logger.info ("%d link loaded from config" % (len (self.linkage_dict.keys ())))
 
     def _parse_alarm_levels (self, alarm_levels, ip=""):
