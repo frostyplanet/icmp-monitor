@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+# coding:utf-8
+
+# example of config_email.py
+
+SMTP = "smtphost.org"
+SMTP_PORT = 587
+SMTP_USERNAME = "user"
+SMTP_PASSWORD = "passwd"
+SENDER_MAIL = "noreply@localhost"
+ALARM_ADDRESS = [
+        "alarm@localhost"
+        ]
+
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 :
