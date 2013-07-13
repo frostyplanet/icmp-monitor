@@ -207,7 +207,10 @@ def fping (dest_addrs, timeout):
                     if not ip_host_dict.has_key (ip):
                         continue
                     recv_dict[ip_host_dict[ip]] = rrt
-                    del send_dict[ip_host_dict[ip]]
+                    try:
+                        del send_dict[ip_host_dict[ip]]
+                    except KeyError:
+                        pass
                 else:
                     recv_dict[ip] = rrt
                     del send_dict[ip]
