@@ -85,11 +85,17 @@
     $Author: $
 """
 
-import os, sys, socket, struct, select, time
+import os
+import sys
+import socket
+import struct
+import select
+import time
 import errno
 
 # From /usr/include/linux/icmp.h; your milage may vary.
-ICMP_ECHO_REQUEST = 8 # Seems to be the same on Solaris.
+ICMP_ECHO_REQUEST = 8  # Seems to be the same on Solaris.
+
 
 def checksum(source_string):
     """
@@ -97,23 +103,25 @@ def checksum(source_string):
     to suggest that it gives the same answers as in_cksum in ping.c
     """
     _sum = 0
-    strlen = len (source_string)
+    strlen = len(source_string)
     count = 0
     while strlen > 1:
-        _sum += ord (source_string[count]) + (ord (source_string[count+1]) << 8)
+        _sum += ord(source_string[count]) + (
+            ord(source_string[count + 1]) << 8)
         strlen -= 2
         count += 2
     if strlen == 1:
-        _sum += ord (source_string[count])
+        _sum += ord(source_string[count])
     _sum = (_sum >> 16) + (_sum & 0xffff)
     _sum += (_sum >> 16)
     answer = ~_sum
     answer = answer & 0xffff
 
-#    # Swap bytes. Bugger me if I know why.
+# Swap bytes. Bugger me if I know why.
 #    answer = answer >> 8 | (answer << 8 & 0xff00)
 
     return answer
+
 
 def receive_one_ping(sock, ID):
     """
@@ -125,10 +133,12 @@ def receive_one_ping(sock, ID):
         "bbHHh", icmp_header
     )
     if icmptype == 0 and packet_id == ID:
-        time_sent = struct.unpack("d", recv_packet[28:28 + struct.calcsize("d")])[0]
-        return (addr[0], time.time () - time_sent)
+        time_sent = struct.unpack(
+            "d", recv_packet[28:28 + struct.calcsize("d")])[0]
+        return (addr[0], time.time() - time_sent)
     else:
-        raise socket.error (errno.EAGAIN, "EAGAIN")
+        raise socket.error(errno.EAGAIN, "EAGAIN")
+
 
 def send_one_ping(my_socket, dest_addr, ID):
     """
@@ -142,7 +152,7 @@ def send_one_ping(my_socket, dest_addr, ID):
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, my_checksum, ID, 1)
     bytesInDouble = struct.calcsize("d")
     data = (192 - bytesInDouble) * "Q"
-    timestamp = time.time ()
+    timestamp = time.time()
     data = struct.pack("d", timestamp) + data
 
     # Calculate the checksum on the data and the dummy header.
@@ -154,16 +164,17 @@ def send_one_ping(my_socket, dest_addr, ID):
         "bbHHh", ICMP_ECHO_REQUEST, 0, my_checksum, ID, 1
     )
     packet = header + data
-    my_socket.sendto (packet, (dest_addr, 1)) # Don't know about the 1
+    my_socket.sendto(packet, (dest_addr, 1))  # Don't know about the 1
     return timestamp
 
-def fping (dest_addrs, timeout):
+
+def fping(dest_addrs, timeout):
     """
     returns (recv_dict, error_dict)
     there's rt in recv_dict, and error reason in error_dict.
     dest_addrs only accept ip addresses.
     """
-    assert isinstance (dest_addrs, list)
+    assert isinstance(dest_addrs, list)
     icmp = socket.getprotobyname("icmp")
     sock = None
     try:
@@ -176,35 +187,35 @@ def fping (dest_addrs, timeout):
                 " running as root."
             )
             raise socket.error(msg)
-        raise # raise the original error
+        raise  # raise the original error
 
     my_ID = os.getpid() & 0xFFFF
-    send_dict = dict ()
-    recv_dict = dict ()
-    error_dict = dict ()
-    ip_host_dict = dict ()
+    send_dict = dict()
+    recv_dict = dict()
+    error_dict = dict()
+    ip_host_dict = dict()
     for dest_addr in dest_addrs:
         try:
-            dest_ip = socket.gethostbyname (dest_addr)
+            dest_ip = socket.gethostbyname(dest_addr)
             if dest_ip != dest_addr:
                 ip_host_dict[dest_ip] = dest_addr
             timestamp = send_one_ping(sock, dest_ip, my_ID)
             send_dict[dest_addr] = 1
         except (socket.gaierror, socket.herror, socket.error), e:
             error_dict[dest_addr] = e
-    sock.setblocking (0)
+    sock.setblocking(0)
     time_left = timeout
-    time1 = time.time ()
+    time1 = time.time()
     while True:
         try:
-            time_left = float(timeout - time.time () + time1)
+            time_left = float(timeout - time.time() + time1)
             if time_left <= 0.0:
                 break
             select.select([sock], [], [], time_left)
-            while len (send_dict.keys ()) > 0:
-                (ip, rrt) = receive_one_ping (sock, my_ID)
-                if not send_dict.has_key (ip):
-                    if not ip_host_dict.has_key (ip):
+            while len(send_dict.keys()) > 0:
+                (ip, rrt) = receive_one_ping(sock, my_ID)
+                if not send_dict.has_key(ip):
+                    if not ip_host_dict.has_key(ip):
                         continue
                     recv_dict[ip_host_dict[ip]] = rrt
                     try:
@@ -214,7 +225,7 @@ def fping (dest_addrs, timeout):
                 else:
                     recv_dict[ip] = rrt
                     del send_dict[ip]
-            if len (send_dict.keys ()) == 0:
+            if len(send_dict.keys()) == 0:
                 break
         except select.error, e:
             if e[0] == errno.EINTR:
@@ -222,59 +233,62 @@ def fping (dest_addrs, timeout):
             raise e
         except socket.error, e:
             if e[0] in [errno.EINTR, errno.EAGAIN]:
-                time_left = timeout - time.time () + time1
+                time_left = timeout - time.time() + time1
                 continue
             raise e
 
-    for addr in send_dict.iterkeys ():
+    for addr in send_dict.iterkeys():
         error_dict[addr] = "timeout"
     sock.close()
     return (recv_dict, error_dict)
 
-def verbose_ping(dest_addrs, timeout = 2):
+
+def verbose_ping(dest_addrs, timeout=2):
     """
     Send >count< ping to >dest_addr< with the given >timeout< and display
     the result.
     """
-    assert isinstance (dest_addrs, list)
+    assert isinstance(dest_addrs, list)
     recv_dict = err_dict = None
     try:
-        (recv_dict, err_dict)  =  fping (dest_addrs, timeout)
+        (recv_dict, err_dict) = fping(dest_addrs, timeout)
     except socket.gaierror, e:
         print "failed. (socket error: '%s')" % e[1]
         return
-    for recv_addr, rrt in recv_dict.iteritems ():
+    for recv_addr, rrt in recv_dict.iteritems():
         print "ok", recv_addr, rrt * 1000, "ms"
-    for err_addr, e in err_dict.iteritems ():
+    for err_addr, e in err_dict.iteritems():
         print "err", err_addr, str(e)
 
-def usage ():
+
+def usage():
     print """ %s -W timeout [IP] """ % (sys.argv[0])
 
-def main ():
+
+def main():
     import getopt
     optlist = None
     args = None
     try:
-        optlist, args = getopt.gnu_getopt (sys.argv[1:], "W:h", ["help"])
+        optlist, args = getopt.gnu_getopt(sys.argv[1:], "W:h", ["help"])
     except getopt.GetoptError, e:
         print >> sys.stderr, str(e)
-        sys.exit (1)
-    if len (args) == 0:
+        sys.exit(1)
+    if len(args) == 0:
         print >> sys.stderr, "target ip is required"
-        sys.exit (1)
+        sys.exit(1)
     timeout = 2
     for opt, v in optlist:
         if opt in ['-h', '--help']:
-            usage ()
-            sys.exit (0)
+            usage()
+            sys.exit(0)
         elif opt == '-W':
             timeout = float(v)
     print "timeout", timeout
-    verbose_ping  (args, timeout=timeout)
+    verbose_ping(args, timeout=timeout)
 
 if __name__ == '__main__':
-    main () 
+    main()
 
-    
+
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 :

@@ -4,6 +4,7 @@
 # author: frostyplanet@gmail.com
 import socket
 
+
 class Linkage (object):
 
     bitmap = None
@@ -15,26 +16,26 @@ class Linkage (object):
     recover_count = 0
     cur_alarm_level = 0
     total_latency = 0.0
-    
-    def __init__ (self, ip, alarm_levels, recover_thres):
+
+    def __init__(self, ip, alarm_levels, recover_thres):
         self.ip = ip
-        assert isinstance (alarm_levels, (tuple, list))
+        assert isinstance(alarm_levels, (tuple, list))
         assert recover_thres > 0
         self.alarm_levels = alarm_levels
         self.recover_thres = recover_thres
-        self.reset_bitmap ()
-        self.hostname = socket.gethostname ()
+        self.reset_bitmap()
+        self.hostname = socket.gethostname()
         self.last_state = True
 
-    def reset_bitmap (self):
+    def reset_bitmap(self):
         self.bitmap = []
         self.total_latency = 0.0
 
-    def new_state (self, is_ok, latency):
+    def new_state(self, is_ok, latency):
         """ pass the current ping state, return alarm state , None for unchange, False for bad, True for normal """
         self.total_latency += latency * 1000.0
         bit = is_ok and '1' or '0'
-        self.bitmap.append (bit)
+        self.bitmap.append(bit)
         if is_ok:
             if self.last_state:
                 self.bad_count = 0
@@ -52,7 +53,7 @@ class Linkage (object):
             return self.last_state
         elif self.bad_count > 0 and self.alarm_levels:
             try:
-                level = self.alarm_levels.index (self.bad_count)
+                level = self.alarm_levels.index(self.bad_count)
                 self.cur_alarm_level = level + 1
                 self.last_state = False
                 return self.last_state
@@ -60,26 +61,24 @@ class Linkage (object):
                 pass
         return None
 
-    def alarm_text (self):
+    def alarm_text(self):
         if self.last_state:
-           return "[alarm] from %s to %s recover" % (self.hostname, self.ip)
+            return "[alarm] from %s to %s recover" % (self.hostname, self.ip)
         else:
-           return "[alarm] from %s to %s timeout(%s)" % (self.hostname, self.ip, self.cur_alarm_level)
+            return "[alarm] from %s to %s timeout(%s)" % (self.hostname, self.ip, self.cur_alarm_level)
 
-
-    def details (self):
+    def details(self):
         state = self.last_state and "good" or "bad"
         avg_latency = -1
-        good_count = len (filter (lambda x: x == '1', self.bitmap))
+        good_count = len(filter(lambda x: x == '1', self.bitmap))
         if good_count > 0:
             avg_latency = self.total_latency / good_count
         return "%s :%s, bitmap=%s, avg_rtt=%.2fms" % (
-                self.ip,
+            self.ip,
                 state,
-                "".join (self.bitmap),
+                "".join(self.bitmap),
                 avg_latency
-                )
+        )
 
 
-        
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 :
