@@ -2,7 +2,11 @@
 # coding:utf-8
 
 import _env
-import config_email
+try:
+    import config_email
+    has_config_email = True
+except ImportError:
+    has_config_email = False
 # config_email.SMTP
 # config_email.SMTP_USERNAME
 # config_email.SMTP_PASSWORD
@@ -11,14 +15,12 @@ import config_email
 
 from email.MIMEText import MIMEText
 from email.Header import Header
-from email.Utils import formataddr
+#from email.Utils import formataddr
 import smtplib
 from lib.job_queue import Job
 
-import socket
 
-
-class AlarmJob (Job):
+class AlarmJob(Job):
 
     def __init__(self, email_alarm, subject, body):
         Job.__init__(self)
@@ -30,14 +32,20 @@ class AlarmJob (Job):
         self.email_alarm.send(self.subject, self.body)
 
 
-class EmailAlarm (object):
+class EmailAlarm(object):
 
     def __init__(self, logger):
-        self.address_list = config_email.ALARM_ADDRESS
-        assert isinstance(self.address_list, (tuple, list, set))
+        if has_config_email:
+            assert isinstance(self.address_list, (tuple, list, set))
+            self.address_list = config_email.ALARM_ADDRESS
+        else:
+            self.address_list = None
         self.logger = logger
 
     def send(self, subject, body):
+        if not self.address_list:
+            self.logger.error("[log_only] %s %s" % (subject, body))
+            return
         try:
             server = smtplib.SMTP(config_email.SMTP, config_email.SMTP_PORT)
             server.ehlo()
