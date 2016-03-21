@@ -124,6 +124,8 @@ class ICMPMonitor (object):
                 res = link.new_state(False, 0)
                 if res is False:
                     self._alarm_enqueue(link)
+                if err != "timeout":
+                    self.logger.error("ip %s error %s" % (ip, err))
                 print ip, "err", link.bitmap
                 if len(link.bitmap) == self.log_length_per_link:
                     self.logger_links.info(link.details())
