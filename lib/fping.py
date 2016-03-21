@@ -30,6 +30,8 @@
     Rewrite by Neptune Ning <frostyplanet@gmail.com> <an.ning@aliyun-inc.com> 2011.7.15
         add parallel ping multiple address feature (only tested on linux), simular to fping.
         not supporting count parameter yet.
+        
+        Fix rtt time resolution 2016.3.21
 
     Revision history
     ~~~~~~~~~~~~~~~~
@@ -96,6 +98,8 @@ import errno
 # From /usr/include/linux/icmp.h; your milage may vary.
 ICMP_ECHO_REQUEST = 8  # Seems to be the same on Solaris.
 
+TIME_DATA_FORMAT = "dd"
+TIME_DATA_LEN = struct.calcsize(TIME_DATA_FORMAT)
 
 def checksum(source_string):
     """
@@ -133,8 +137,9 @@ def receive_one_ping(sock, ID):
         "bbHHh", icmp_header
     )
     if icmptype == 0 and packet_id == ID:
-        time_sent = struct.unpack(
-            "d", recv_packet[28:28 + struct.calcsize("d")])[0]
+        time_sent1, time_sent2 = struct.unpack(
+            TIME_DATA_FORMAT, recv_packet[28:28 + TIME_DATA_LEN])[0]
+        time_sent = time_sent1 + time_sent2 / 1000.0 / 1000.0
         return (addr[0], time.time() - time_sent)
     else:
         raise socket.error(errno.EAGAIN, "EAGAIN")
@@ -150,10 +155,11 @@ def send_one_ping(my_socket, dest_addr, ID):
 
     # Make a dummy heder with a 0 checksum.
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, my_checksum, ID, 1)
-    bytesInDouble = struct.calcsize("d")
-    data = (192 - bytesInDouble) * "Q"
+    time_size = struct.calcsize("dd")
+    data = (192 - time_size) * "Q"
     timestamp = time.time()
-    data = struct.pack("d", timestamp) + data
+    z = int(timestamp)
+    data = struct.pack("dd", z, int(1000 * 1000 * (timestamp - z))) + data
 
     # Calculate the checksum on the data and the dummy header.
     my_checksum = checksum(header + data)
@@ -167,80 +173,92 @@ def send_one_ping(my_socket, dest_addr, ID):
     my_socket.sendto(packet, (dest_addr, 1))  # Don't know about the 1
     return timestamp
 
+class FPing(object):
 
-def fping(dest_addrs, timeout):
-    """
-    returns (recv_dict, error_dict)
-    there's rt in recv_dict, and error reason in error_dict.
-    dest_addrs only accept ip addresses.
-    """
-    assert isinstance(dest_addrs, list)
-    icmp = socket.getprotobyname("icmp")
-    sock = None
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp)
-    except socket.error, (err, msg):
-        if err == 1:
-            # Operation not permitted
-            msg = msg + (
-                " - Note that ICMP messages can only be sent from processes"
-                " running as root."
-            )
-            raise socket.error(msg)
-        raise  # raise the original error
-
-    my_ID = os.getpid() & 0xFFFF
-    send_dict = dict()
-    recv_dict = dict()
-    error_dict = dict()
-    ip_host_dict = dict()
-    for dest_addr in dest_addrs:
+    def __init__(self, dest_addrs):
+        assert isinstance(dest_addrs, list)
+        self.dest_addrs = dest_addrs
+        icmp = socket.getprotobyname("icmp")
+        self.my_ID = os.getpid() & 0xFFFF
+        self.ip_host_dict = dict()
         try:
-            dest_ip = socket.gethostbyname(dest_addr)
-            if dest_ip != dest_addr:
-                ip_host_dict[dest_ip] = dest_addr
-            timestamp = send_one_ping(sock, dest_ip, my_ID)
-            send_dict[dest_addr] = 1
-        except (socket.gaierror, socket.herror, socket.error), e:
-            error_dict[dest_addr] = e
-    sock.setblocking(0)
-    time_left = timeout
-    time1 = time.time()
-    while True:
-        try:
-            time_left = float(timeout - time.time() + time1)
-            if time_left <= 0.0:
-                break
-            select.select([sock], [], [], time_left)
-            while len(send_dict.keys()) > 0:
-                (ip, rrt) = receive_one_ping(sock, my_ID)
-                if not send_dict.has_key(ip):
-                    if not ip_host_dict.has_key(ip):
-                        continue
-                    recv_dict[ip_host_dict[ip]] = rrt
-                    try:
-                        del send_dict[ip_host_dict[ip]]
-                    except KeyError:
-                        pass
-                else:
-                    recv_dict[ip] = rrt
-                    del send_dict[ip]
-            if len(send_dict.keys()) == 0:
-                break
-        except select.error, e:
-            if e[0] == errno.EINTR:
-                continue
-            raise e
-        except socket.error, e:
-            if e[0] in [errno.EINTR, errno.EAGAIN]:
-                time_left = timeout - time.time() + time1
-                continue
-            raise e
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp)
+            self.sock.setblocking(0)
+        except socket.error, (err, msg):
+            if err == 1:
+                # Operation not permitted
+                msg = msg + (
+                    " - Note that ICMP messages can only be sent from processes"
+                    " running as root."
+                )
+                raise socket.error(msg)
+            raise  # raise the original error
 
-    for addr in send_dict.iterkeys():
-        error_dict[addr] = "timeout"
-    sock.close()
-    return (recv_dict, error_dict)
+    def ping(self, timeout):
+        """
+        returns (recv_dict, error_dict)
+        there's rt in recv_dict, and error reason in error_dict.
+        dest_addrs only accept ip addresses.
+        """
+        send_dict = dict()
+        recv_dict = dict()
+        error_dict = dict()
+        for dest_addr in self.dest_addrs:
+            try:
+                dest_ip = socket.gethostbyname(dest_addr)
+                if dest_ip != dest_addr:
+                    self.ip_host_dict[dest_ip] = dest_addr
+                    self.ip_host_dict[dest_addr] = dest_ip
+            except (socket.gaierror, socket.herror, socket.error), e:
+                error_dict[dest_addr] = e
+
+        for dest_addr in self.dest_addrs:
+            try:
+                if error_dict.has_key(dest_addr):
+                    continue
+                dest_ip = self.ip_host_dict.get(dest_addr)
+                if not dest_ip:
+                    dest_ip = dest_addr
+                send_one_ping(self.sock, dest_ip, self.my_ID)
+                send_dict[dest_addr] = 1
+            except (socket.gaierror, socket.herror, socket.error), e:
+                error_dict[dest_addr] = e
+
+        time_left = timeout
+        time1 = time.time()
+        sock_list = [self.sock]
+        while True:
+            try:
+                time_left = float(timeout - time.time() + time1)
+                if time_left <= 0.0:
+                    break
+                while send_dict:
+                    (ip, rrt) = receive_one_ping(self.sock, self.my_ID)
+                    if not send_dict.has_key(ip):
+                        host = self.ip_host_dict.get(ip)
+                        if not host:
+                            continue
+                        recv_dict[host] = rrt
+                        del send_dict[host]
+                    else:
+                        recv_dict[ip] = rrt
+                        del send_dict[ip]
+                if not send_dict:
+                    break
+            except select.error, e:
+                if e[0] == errno.EINTR:
+                    continue
+                raise e
+            except socket.error, e:
+                if e[0] in [errno.EINTR, errno.EAGAIN]:
+                    select.select(sock_list, [], [], time_left)
+                    time_left = timeout - time.time() + time1
+                    continue
+                raise e
+
+        for addr in send_dict.iterkeys():
+            error_dict[addr] = "timeout"
+        return (recv_dict, error_dict)
 
 
 def verbose_ping(dest_addrs, timeout=2):
@@ -251,7 +269,8 @@ def verbose_ping(dest_addrs, timeout=2):
     assert isinstance(dest_addrs, list)
     recv_dict = err_dict = None
     try:
-        (recv_dict, err_dict) = fping(dest_addrs, timeout)
+        o = FPing(dest_addrs)
+        (recv_dict, err_dict) = o.ping(timeout)
     except socket.gaierror, e:
         print "failed. (socket error: '%s')" % e[1]
         return

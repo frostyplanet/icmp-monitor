@@ -8,7 +8,7 @@ import sys
 import config
 from lib.log import Log
 import lib.daemon as daemon
-from lib.fping import fping
+from lib.fping import FPing
 from mod.linkage import Linkage
 from lib.job_queue import JobQueue
 from mod.alarm import EmailAlarm, AlarmJob
@@ -106,9 +106,10 @@ class ICMPMonitor (object):
 
     def loop(self):
         ips = self.linkage_dict.keys()
+        fping = FPing(ips)
         while self.is_running:
             start_time = time.time()
-            recv_dict, error_dict = fping(ips, 1)
+            recv_dict, error_dict = fping.ping(1)
             for ip, rtt in recv_dict.iteritems():
                 link = self.linkage_dict[ip]
                 res = link.new_state(True, rtt)
