@@ -138,7 +138,7 @@ def receive_one_ping(sock, ID):
     )
     if icmptype == 0 and packet_id == ID:
         time_sent1, time_sent2 = struct.unpack(
-            TIME_DATA_FORMAT, recv_packet[28:28 + TIME_DATA_LEN])[0]
+            TIME_DATA_FORMAT, recv_packet[28:28 + TIME_DATA_LEN])
         time_sent = time_sent1 + time_sent2 / 1000.0 / 1000.0
         return (addr[0], time.time() - time_sent)
     else:
