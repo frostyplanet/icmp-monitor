@@ -40,10 +40,10 @@ class ICMPMonitor (object):
             g_recover = int(config.recover)
         links = config.links
         if isinstance(links, dict):
-            for ip, v in links.iteritems():
+            for ip, v in links.items():
                 if not isinstance(v, dict):
                     v = dict()
-                ttl = v.get('ttl')
+                ttl = v.get('ttl') or 0
                 if ttl >= 0:
                     pass
                 else:
@@ -70,13 +70,13 @@ class ICMPMonitor (object):
                     continue
                 self.linkage_dict[ip] = Linkage(ip, alarm_levels, recover)
         self.logger.info("%d link loaded from config" %
-                         (len(self.linkage_dict.keys())))
+                         (len(list(self.linkage_dict.keys()))))
 
     def _parse_alarm_levels(self, alarm_levels, ip=""):
         if not isinstance(alarm_levels, (tuple, list)):
             self.logger.error("config: %s, alarm_levels is not a list" % (ip))
             return
-        _alarm_levels = filter(lambda x: isinstance(x, int), alarm_levels)
+        _alarm_levels = [x for x in alarm_levels if isinstance(x, int)]
         if len(_alarm_levels) != len(alarm_levels):
             self.logger.error(
                 "config: %s, elements in alarm_levels must be integers" % (ip))
@@ -105,28 +105,28 @@ class ICMPMonitor (object):
         self.alarm_q.put_job(job)
 
     def loop(self):
-        ips = self.linkage_dict.keys()
+        ips = list(self.linkage_dict.keys())
         fping = FPing(ips)
         while self.is_running:
             start_time = time.time()
             recv_dict, error_dict = fping.ping(1)
-            for ip, rtt in recv_dict.iteritems():
+            for ip, rtt in recv_dict.items():
                 link = self.linkage_dict[ip]
                 res = link.new_state(True, rtt)
                 if res:
                     self._alarm_enqueue(link)
-                print ip, "ok", rtt
+                print(ip, "ok", rtt)
                 if len(link.bitmap) == self.log_length_per_link:
                     self.logger_links.info(link.details())
                     link.reset_bitmap()
-            for ip, err in error_dict.iteritems():
+            for ip, err in error_dict.items():
                 link = self.linkage_dict[ip]
                 res = link.new_state(False, 0)
                 if res is False:
                     self._alarm_enqueue(link)
                 if err != "timeout":
                     self.logger.error("ip %s error %s" % (ip, err))
-                print ip, "err", link.bitmap
+                print(ip, "err", link.bitmap)
                 if len(link.bitmap) == self.log_length_per_link:
                     self.logger_links.info(link.details())
                     link.reset_bitmap()
@@ -157,8 +157,8 @@ def _main():
 
 
 def usage():
-    print "usage:\t%s star/stop/restart\t#manage forked daemon" % (sys.argv[0])
-    print "\t%s run\t\t# run without daemon, for test purpose" % (sys.argv[0])
+    print("usage:\t%s star/stop/restart\t#manage forked daemon" % (sys.argv[0]))
+    print("\t%s run\t\t# run without daemon, for test purpose" % (sys.argv[0]))
     os._exit(1)
 
 

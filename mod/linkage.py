@@ -70,7 +70,7 @@ class Linkage (object):
     def details(self):
         state = self.last_state and "good" or "bad"
         avg_latency = -1
-        good_count = len(filter(lambda x: x == '1', self.bitmap))
+        good_count = len([x for x in self.bitmap if x == '1'])
         if good_count > 0:
             avg_latency = self.total_latency / good_count
         return "%s :%s, bitmap=%s, avg_rtt=%.2fms" % (

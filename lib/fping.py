@@ -30,7 +30,7 @@
     Rewrite by Neptune Ning <frostyplanet@gmail.com> <an.ning@aliyun-inc.com> 2011.7.15
         add parallel ping multiple address feature (only tested on linux), simular to fping.
         not supporting count parameter yet.
-        
+
         Fix rtt time resolution 2016.3.21
 
     Revision history
@@ -110,8 +110,8 @@ def checksum(source_string):
     strlen = len(source_string)
     count = 0
     while strlen > 1:
-        _sum += ord(source_string[count]) + (
-            ord(source_string[count + 1]) << 8)
+        _sum += source_string[count] + (
+            source_string[count + 1] << 8)
         strlen -= 2
         count += 2
     if strlen == 1:
@@ -159,7 +159,7 @@ def send_one_ping(my_socket, dest_addr, ID):
     data = (192 - time_size) * "Q"
     timestamp = time.time()
     z = int(timestamp)
-    data = struct.pack("dd", z, int(1000 * 1000 * (timestamp - z))) + data
+    data = struct.pack("dd", z, int(1000 * 1000 * (timestamp - z))) + data.encode()
 
     # Calculate the checksum on the data and the dummy header.
     my_checksum = checksum(header + data)
@@ -184,7 +184,8 @@ class FPing(object):
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp)
             self.sock.setblocking(0)
-        except socket.error, (err, msg):
+        except socket.error as xxx_todo_changeme:
+            (err, msg) = xxx_todo_changeme.args
             if err == 1:
                 # Operation not permitted
                 msg = msg + (
@@ -209,19 +210,19 @@ class FPing(object):
                 if dest_ip != dest_addr:
                     self.ip_host_dict[dest_ip] = dest_addr
                     self.ip_host_dict[dest_addr] = dest_ip
-            except (socket.gaierror, socket.herror, socket.error), e:
+            except (socket.gaierror, socket.herror, socket.error) as e:
                 error_dict[dest_addr] = e
 
         for dest_addr in self.dest_addrs:
             try:
-                if error_dict.has_key(dest_addr):
+                if dest_addr in error_dict:
                     continue
                 dest_ip = self.ip_host_dict.get(dest_addr)
                 if not dest_ip:
                     dest_ip = dest_addr
                 send_one_ping(self.sock, dest_ip, self.my_ID)
                 send_dict[dest_addr] = 1
-            except (socket.gaierror, socket.herror, socket.error), e:
+            except (socket.gaierror, socket.herror, socket.error) as e:
                 error_dict[dest_addr] = e
 
         time_left = timeout
@@ -234,7 +235,7 @@ class FPing(object):
                     break
                 while send_dict:
                     (ip, rrt) = receive_one_ping(self.sock, self.my_ID)
-                    if not send_dict.has_key(ip):
+                    if ip not in send_dict:
                         host = self.ip_host_dict.get(ip)
                         if not host:
                             continue
@@ -245,18 +246,12 @@ class FPing(object):
                         del send_dict[ip]
                 if not send_dict:
                     break
-            except select.error, e:
-                if e[0] == errno.EINTR:
-                    continue
-                raise e
-            except socket.error, e:
-                if e[0] in [errno.EINTR, errno.EAGAIN]:
-                    select.select(sock_list, [], [], time_left)
-                    time_left = timeout - time.time() + time1
-                    continue
-                raise e
+            except BlockingIOError:
+                select.select(sock_list, [], [], time_left)
+                time_left = timeout - time.time() + time1
+                continue
 
-        for addr in send_dict.iterkeys():
+        for addr in send_dict.keys():
             error_dict[addr] = "timeout"
         return (recv_dict, error_dict)
 
@@ -271,17 +266,17 @@ def verbose_ping(dest_addrs, timeout=2):
     try:
         o = FPing(dest_addrs)
         (recv_dict, err_dict) = o.ping(timeout)
-    except socket.gaierror, e:
-        print "failed. (socket error: '%s')" % e[1]
+    except socket.gaierror as e:
+        print("failed. (socket error: '%s')" % e[1])
         return
-    for recv_addr, rrt in recv_dict.iteritems():
-        print "ok", recv_addr, rrt * 1000, "ms"
-    for err_addr, e in err_dict.iteritems():
-        print "err", err_addr, str(e)
+    for recv_addr, rrt in recv_dict.items():
+        print("ok", recv_addr, rrt * 1000, "ms")
+    for err_addr, e in err_dict.items():
+        print("err", err_addr, str(e))
 
 
 def usage():
-    print """ %s -W timeout [IP] """ % (sys.argv[0])
+    print(""" %s -W timeout [IP] """ % (sys.argv[0]))
 
 
 def main():
@@ -290,11 +285,11 @@ def main():
     args = None
     try:
         optlist, args = getopt.gnu_getopt(sys.argv[1:], "W:h", ["help"])
-    except getopt.GetoptError, e:
-        print >> sys.stderr, str(e)
+    except getopt.GetoptError as e:
+        print(str(e), file=sys.stderr)
         sys.exit(1)
     if len(args) == 0:
-        print >> sys.stderr, "target ip is required"
+        print("target ip is required", file=sys.stderr)
         sys.exit(1)
     timeout = 2
     for opt, v in optlist:
@@ -303,7 +298,7 @@ def main():
             sys.exit(0)
         elif opt == '-W':
             timeout = float(v)
-    print "timeout", timeout
+    print("timeout", timeout)
     verbose_ping(args, timeout=timeout)
 
 if __name__ == '__main__':

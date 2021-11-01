@@ -48,8 +48,8 @@ class Log (logging.Logger):
                 __log_level = self.log_level_map[config.log_level]
             if __log_level and isinstance(__log_level, str):
                 __log_level = self.log_level_map[__log_level]
-        except Exception, e:
-            print "log_level", str(e)
+        except Exception as e:
+            print("log_level", str(e))
 
         if not filename:
             filename = "main"
@@ -58,7 +58,7 @@ class Log (logging.Logger):
         if file_dir:
             if os.path.exists(file_dir):
                 if not os.path.isdir(file_dir):
-                    raise Exception, "logging path '%s' is not a directory"
+                    raise Exception("logging path '%s' is not a directory")
             else:
                 os.mkdir(file_dir)
 
@@ -81,7 +81,7 @@ class Log (logging.Logger):
             pass
         try:
             self.__file_handler.close()
-        except Exception, e:
+        except Exception as e:
             pass
 
     def format_frame(f):
